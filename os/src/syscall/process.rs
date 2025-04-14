@@ -2,6 +2,7 @@
 use crate::{
     task::{exit_current_and_run_next, suspend_current_and_run_next, TASK_MANAGER},
     timer::get_time_us,
+    config::MAX_APP_NUM,
 };
 
 #[repr(C)]
@@ -10,6 +11,8 @@ pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
 }
+
+static mut TASK_TIMES: [i32; MAX_APP_NUM] = [0; MAX_APP_NUM];
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -60,7 +63,8 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
         return 0;
     }
     else if _trace_request == 2 {
-        //let task
+        let task = TASK_MANAGER.current_task_id();
+        
         return -1;
     }
     else {
