@@ -1,8 +1,7 @@
 //! Process management syscalls
 use crate::{
-    task::{exit_current_and_run_next, suspend_current_and_run_next, TASK_MANAGER},
+    task::{exit_current_and_run_next, suspend_current_and_run_next, get_current_task_syscall_times},
     timer::get_time_us,
-    config::MAX_APP_NUM,
 };
 
 #[repr(C)]
@@ -11,8 +10,6 @@ pub struct TimeVal {
     pub sec: usize,
     pub usec: usize,
 }
-
-static mut TASK_TIMES: [i32; MAX_APP_NUM] = [0; MAX_APP_NUM];
 
 /// task exits and submit an exit code
 pub fn sys_exit(exit_code: i32) -> ! {
@@ -63,9 +60,9 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
         return 0;
     }
     else if _trace_request == 2 {
-        let task = TASK_MANAGER.current_task_id();
+        let times = get_current_task_syscall_times(_id);
         
-        return -1;
+        return times as isize;
     }
     else {
         return -1;

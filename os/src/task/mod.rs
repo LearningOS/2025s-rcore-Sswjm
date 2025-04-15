@@ -14,7 +14,7 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
-use crate::config::MAX_APP_NUM;
+use crate::config::{MAX_APP_NUM, MAX_SYSCALL_NUM};
 use crate::loader::{get_num_app, init_app_cx};
 use crate::sync::UPSafeCell;
 use lazy_static::*;
@@ -54,6 +54,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            task_syscall_times: [0; MAX_SYSCALL_NUM],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -64,6 +65,7 @@ lazy_static! {
             inner: unsafe {
                 UPSafeCell::new(TaskManagerInner {
                     tasks,
+                    //task_syscall_times: [0; MAX_SYSCALL_NUM],
                     current_task: 0,
                 })
             },
@@ -136,9 +138,18 @@ impl TaskManager {
         }
     }
 
-    /// Return current task id
-    pub fn current_task_id(&self) -> usize {
-        self.inner.exclusive_access().current_task
+    /// Current task syscall times + 1
+    fn increase_syscall_times(&self, id: usize) {
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall_times[id] += 1;
+    }
+
+    /// Return current task syscall times
+    fn get_syscall_times(&self, id: usize) -> u32{
+        let inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        inner.tasks[current].task_syscall_times[id]
     }
 }
 
@@ -173,4 +184,14 @@ pub fn suspend_current_and_run_next() {
 pub fn exit_current_and_run_next() {
     mark_current_exited();
     run_next_task();
+}
+
+/// Increase current task syscall times
+pub fn increase_current_task_syscall_times(id: usize) {
+    TASK_MANAGER.increase_syscall_times(id);
+}
+
+/// Get current task syscall times
+pub fn get_current_task_syscall_times(id: usize) -> u32{
+    TASK_MANAGER.get_syscall_times(id)
 }
