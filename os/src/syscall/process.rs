@@ -115,6 +115,34 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
 
 // YOUR JOB: Implement mmap.
 pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+    /*** 
+        syscall ID：222
+
+        申请长度为 len 字节的物理内存（不要求实际物理内存位置，可以随便找一块），将其映射到 start 开始的虚存，内存页属性为 prot
+
+        参数：
+        start 需要映射的虚存起始地址，要求按页对齐
+
+        len 映射字节长度，可以为 0
+
+        prot：第 0 位表示是否可读，第 1 位表示是否可写，第 2 位表示是否可执行。其他位无效且必须为 0
+
+        返回值：执行成功则返回 0，错误返回 -1
+
+        说明：
+        为了简单，目标虚存区间要求按页对齐，len 可直接按页向上取整，不考虑分配失败时的页回收。
+
+        可能的错误：
+        start 没有按页大小对齐
+
+        prot & !0x7 != 0 (prot 其余位必须为0)
+
+        prot & 0x7 = 0 (这样的内存无意义)
+
+        [start, start + len) 中存在已经被映射的页
+
+        物理内存不足
+    ***/
     trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
     -1
 }
