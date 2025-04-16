@@ -1,5 +1,5 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next};
+use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, get_current_task_syscall_times};
 use crate::timer::get_time_us;
 use crate::mm::copyout;
 
@@ -51,8 +51,37 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 /// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+    /*** 
+    *   如果 trace_request 为 0，则 id 应被视作 *const u8 ，表示读取当前任务 id 地址处一个字节的无符号整数值。此时应忽略 data 参数。返回值为 id 地址处的值。
+    *
+    *   如果 trace_request 为 1，则 id 应被视作 *const u8 ，表示写入 data （作为 u8，即只考虑最低位的一个字节）到该用户程序 id 地址处。返回值应为0。
+    *
+    *   如果 trace_request 为 2，表示查询当前任务调用编号为 id 的系统调用的次数，返回值为这个调用次数。本次调用也计入统计 。
+    *
+    *   在读取（trace_request 为 0）时，如果对应地址用户不可见或不可读，则返回值应为 -1（isize 格式的 -1，而非 u8）。
+
+    *   在写入（trace_request 为 1）时，如果对应地址用户不可见或不可写，则返回值应为 -1（isize 格式的 -1，而非 u8）。
+    *
+    *   否则，忽略其他参数，返回值为 -1。
+    ***/
     trace!("kernel: sys_trace");
-    -1
+    if _trace_request == 0 {
+        let _addr = _id as *const u8;
+        unsafe {*_addr as isize}
+    }
+    else if _trace_request == 1 {
+        let _addr = _id as *mut u8;
+        unsafe { *_addr = _data as u8};
+        return 0;
+    }
+    else if _trace_request == 2 {
+        let times = get_current_task_syscall_times(_id);
+        
+        return times as isize;
+    }
+    else {
+        return -1;
+    }
 }
 
 // YOUR JOB: Implement mmap.
