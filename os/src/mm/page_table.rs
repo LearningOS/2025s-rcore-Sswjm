@@ -60,6 +60,10 @@ impl PageTableEntry {
     pub fn is_valid(&self) -> bool {
         (self.flags() & PTEFlags::V) != PTEFlags::empty()
     }
+    /// The page pointered by page table entry is from user space?
+    pub fn is_user(&self) -> bool {
+        (self.flags() & PTEFlags::U) != PTEFlags::empty()
+    }
     /// The page pointered by page table entry is readable?
     pub fn readable(&self) -> bool {
         (self.flags() & PTEFlags::R) != PTEFlags::empty()
@@ -184,6 +188,7 @@ pub fn translated_byte_buffer(token: usize, ptr: *const u8, len: usize) -> Vec<&
 
 /// Copy datatype T from kernel space to user space 
 /// This function refer to xv6 kernel/vm.c: copyout and function traslated_byte_buffer above
+/// I use deepseek to tell me how to use copy_nonoverlapping (later I know I can use copy_from_slice instead)
 pub fn copyout<T>(src: &T, dst: *mut T) {
     if core::mem::size_of::<T>() == 0 {
         return;
@@ -203,17 +208,14 @@ pub fn copyout<T>(src: &T, dst: *mut T) {
         let copy_len = buffer.len().min(len - copied);
         
         if copy_len == 0 || copied + copy_len > len {
-            panic!("Over length");
+            break;
         }
 
         unsafe {
+            // buffer[..copy_len].copy_from_slice(&src_bytes[copied..copied + copy_len]);   => why this doesn't work ???
             core::ptr::copy_nonoverlapping(src_bytes[copied..].as_ptr(), buffer.as_mut_ptr(), copy_len);
         }
         
         copied += copy_len;
-        
-        if copied == len {
-            break;
-        }
     }
 }

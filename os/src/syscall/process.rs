@@ -1,7 +1,8 @@
 //! Process management syscalls
-use crate::task::{change_program_brk, exit_current_and_run_next, suspend_current_and_run_next, get_current_task_syscall_times};
+
+use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, get_current_task_syscall_times, suspend_current_and_run_next};
 use crate::timer::get_time_us;
-use crate::mm::copyout;
+use crate::mm::{copyout, PageTable, PhysAddr, VirtAddr /*translated_byte_buffer*/};
 
 #[repr(C)]
 #[derive(Debug)]
@@ -59,28 +60,55 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     *   如果 trace_request 为 2，表示查询当前任务调用编号为 id 的系统调用的次数，返回值为这个调用次数。本次调用也计入统计 。
     *
     *   在读取（trace_request 为 0）时，如果对应地址用户不可见或不可读，则返回值应为 -1（isize 格式的 -1，而非 u8）。
-
+    *
     *   在写入（trace_request 为 1）时，如果对应地址用户不可见或不可写，则返回值应为 -1（isize 格式的 -1，而非 u8）。
     *
     *   否则，忽略其他参数，返回值为 -1。
     ***/
     trace!("kernel: sys_trace");
-    if _trace_request == 0 {
-        let _addr = _id as *const u8;
-        unsafe {*_addr as isize}
-    }
-    else if _trace_request == 1 {
-        let _addr = _id as *mut u8;
-        unsafe { *_addr = _data as u8};
-        return 0;
-    }
-    else if _trace_request == 2 {
-        let times = get_current_task_syscall_times(_id);
-        
-        return times as isize;
-    }
-    else {
-        return -1;
+    let token = current_user_token();  // satp
+    let pgtbl = PageTable::from_token(token);  // user page table
+    let vaddr = VirtAddr::from(_id);
+    // can't just simply use unwrap here
+    let pte = match pgtbl.translate(vaddr.floor()) {
+        Some(pte ) => pte,
+        None => return -1,
+    };  // get user pgtbl's pte
+
+    // I use match here instead of if-else in ch3
+    match _trace_request {
+        0 => {
+            if !pte.is_user() || !pte.readable() {
+                -1
+            }
+            else {
+                let physical_page_number: PhysAddr = pte.ppn().into();
+                let offset = vaddr.page_offset(); 
+                let paddr = physical_page_number.0 | offset; 
+                unsafe {*(paddr as *const u8) as isize}
+            }
+        }
+        1 => {
+            if !pte.is_user() || !pte.writable() {
+                -1
+            }
+            else {
+                let physical_page_number: PhysAddr = pte.ppn().into();
+                let offset = vaddr.page_offset();
+                let paddr = physical_page_number.0 | offset;
+                unsafe {
+                    *(paddr as *mut u8) = _data as u8;
+                    0
+                }
+            }
+
+        }
+        2 => {
+            get_current_task_syscall_times(_id) as isize
+        }
+        _ => {
+            -1
+        }
     }
 }
 
