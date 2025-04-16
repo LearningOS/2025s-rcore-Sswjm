@@ -51,6 +51,7 @@ pub fn sys_get_time(_ts: *mut TimeVal, _tz: usize) -> isize {
 
 /// TODO: Finish sys_trace to pass testcases
 /// HINT: You might reimplement it with virtual memory management.
+/// refer to xv6 kernel/vm.c:walkaddr
 pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
     /*** 
     *   如果 trace_request 为 0，则 id 应被视作 *const u8 ，表示读取当前任务 id 地址处一个字节的无符号整数值。此时应忽略 data 参数。返回值为 id 地址处的值。
