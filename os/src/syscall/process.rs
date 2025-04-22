@@ -1,8 +1,9 @@
 //! Process management syscalls
 
-use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, get_current_task_syscall_times, suspend_current_and_run_next};
+use crate::task::{change_program_brk, current_user_token, exit_current_and_run_next, get_current_task_syscall_times, suspend_current_and_run_next, task_mmap, task_munmap,};
 use crate::timer::get_time_us;
 use crate::mm::{copyout, PageTable, PhysAddr, VirtAddr /*translated_byte_buffer*/};
+use crate::config::PAGE_SIZE;
 
 #[repr(C)]
 #[derive(Debug)]
@@ -114,7 +115,7 @@ pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
 }
 
 // YOUR JOB: Implement mmap.
-pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
+pub fn sys_mmap(_start: usize, _len: usize, _prot: usize) -> isize {
     /*** 
         syscall ID：222
 
@@ -143,14 +144,22 @@ pub fn sys_mmap(_start: usize, _len: usize, _port: usize) -> isize {
 
         物理内存不足
     ***/
-    trace!("kernel: sys_mmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_mmap");
+    if !VirtAddr::from(_start).aligned() || _prot & !0x7 != 0 || _prot & 0x7 == 0 {
+        return -1;
+    }
+
+    let len_aligned = (_len + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+    task_mmap(_start, len_aligned, _prot << 1)
 }
 
 // YOUR JOB: Implement munmap.
 pub fn sys_munmap(_start: usize, _len: usize) -> isize {
-    trace!("kernel: sys_munmap NOT IMPLEMENTED YET!");
-    -1
+    trace!("kernel: sys_munmap");
+    if !VirtAddr::from(_start).aligned() {return -1;}
+    let len_aligned = (_len + PAGE_SIZE - 1) / PAGE_SIZE * PAGE_SIZE;
+
+    task_munmap(_start, len_aligned)
 }
 /// change data segment size
 pub fn sys_sbrk(size: i32) -> isize {

@@ -262,6 +262,53 @@ impl MemorySet {
             false
         }
     }
+
+    /// check if [start, end] is out of range
+    #[allow(unused)]
+    pub fn is_out_of_range(&self, start: VirtPageNum, end: VirtPageNum) -> bool {
+        for area in &self.areas {
+            let low_bound = area.vpn_range.get_start();
+            let high_bound = area.vpn_range.get_end();
+
+            if start < high_bound && end > low_bound {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    /// check if [start, end] in memory set
+    #[allow(unused)]
+    pub fn is_in_memory_set(&self, start: VirtPageNum, end: VirtPageNum) -> bool {
+        for area in &self.areas {
+            let low_bound = area.vpn_range.get_start();
+            let high_bound = area.vpn_range.get_end();
+
+            if start == low_bound && end == high_bound {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// unmap a maparea
+    #[allow(unused)]
+    pub fn memoryset_unmap(&mut self, start: VirtPageNum) {
+        if let Some(area) = self
+            .areas
+            .iter()
+            .position(|area| area.vpn_range.get_start() == start) {
+                let ar = &mut self.areas[area];
+                ar.unmap(&mut self.page_table);
+
+                self.areas.remove(area);
+            } 
+        else {
+            panic!("unmap wrong area");
+        }
+    }
 }
 /// map area structure, controls a contiguous piece of virtual memory
 pub struct MapArea {

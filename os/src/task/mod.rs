@@ -14,7 +14,9 @@ mod switch;
 #[allow(clippy::module_inception)]
 mod task;
 
+use crate::config::PAGE_SIZE;
 use crate::loader::{get_app_data, get_num_app};
+use crate::mm::{MapPermission, VirtAddr, VirtPageNum};
 use crate::sync::UPSafeCell;
 use crate::trap::TrapContext;
 use alloc::vec::Vec;
@@ -167,6 +169,47 @@ impl TaskManager {
         let current = inner.current_task;
         inner.tasks[current].task_syscall_times[id]
     }
+
+    /// mmap
+    fn task_mmap(&self, start: usize, len: usize, prot: usize) -> isize {
+        if len % PAGE_SIZE != 0 {
+            panic!("mmap not aligned");
+        }
+
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let end = start + len;
+        let current_mamory_set = &mut inner.tasks[current].memory_set;
+
+        let start_vpn = VirtPageNum::from(VirtAddr::from(start));
+        let end_vpn = VirtPageNum::from(VirtAddr::from(end));
+        if !current_mamory_set.is_out_of_range(start_vpn, end_vpn) {
+            return -1;
+        }
+
+        current_mamory_set.insert_framed_area(VirtAddr::from(start), VirtAddr::from(end), 
+        MapPermission::U | MapPermission::from_bits_truncate(prot as u8));
+        0
+    }
+
+    //munmap
+    fn task_munmap(&self, start: usize, len: usize) -> isize {
+        if len % PAGE_SIZE != 0 {
+            panic!("mmap not aligned");
+        }
+
+        let mut inner = self.inner.exclusive_access();
+        let current = inner.current_task;
+        let end = start + len;
+        let current_memory_set = &mut inner.tasks[current].memory_set;
+
+        let start_vpn = VirtPageNum::from(VirtAddr::from(start));
+        let end_vpn = VirtPageNum::from(VirtAddr::from(end));
+        if !current_memory_set.is_in_memory_set(start_vpn, end_vpn) {return -1}
+
+        current_memory_set.memoryset_unmap(start_vpn);
+        0
+    }
 }
 
 /// Run the first task in task list.
@@ -225,4 +268,14 @@ pub fn increase_current_task_syscall_times(id: usize) {
 /// Get current task syscall times
 pub fn get_current_task_syscall_times(id: usize) -> u32{
     TASK_MANAGER.get_syscall_times(id)
+}
+
+/// Mmap
+pub fn task_mmap(start: usize, len: usize, prot: usize) -> isize {
+    TASK_MANAGER.task_mmap(start, len, prot)
+}
+
+/// Munmap
+pub fn task_munmap(start: usize, len: usize) -> isize {
+    TASK_MANAGER.task_munmap(start, len)
 }
